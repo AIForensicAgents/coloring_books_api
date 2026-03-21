@@ -117,6 +117,50 @@ def error_response(message, status_code):
     return jsonify({"error": message}), status_code
 
 
+DELETE_PASSWORD = "noodle"
+
+
+def delete_file_if_exists(path):
+    if path and os.path.exists(path) and os.path.isfile(path):
+        os.remove(path)
+
+
+def remove_from_master_list(page_ids):
+    if not os.path.exists(MASTER_LIST):
+        return
+
+    page_ids = set(page_ids)
+    kept_lines = []
+
+    with open(MASTER_LIST, "r") as f:
+        for line in f:
+            stripped = line.rstrip("\n")
+            if not stripped:
+                continue
+            parts = stripped.split("|")
+            if parts and parts[0] not in page_ids:
+                kept_lines.append(line)
+
+    with open(MASTER_LIST, "w") as f:
+        f.writelines(kept_lines)
+
+
+def delete_page_assets(page_id, metadata=None):
+    if metadata is None:
+        metadata = load_page(page_id)
+
+    if metadata:
+        delete_file_if_exists(metadata.get("thumbnail_path", ""))
+        delete_file_if_exists(metadata.get("fullsize_path", ""))
+
+    for directory in [IMAGES_THUMBNAILS, IMAGES_FULLSIZE]:
+        for ext in [".png", ".jpg", ".jpeg", ".webp", ".gif"]:
+            candidate = os.path.join(directory, f"{page_id}{ext}")
+            delete_file_if_exists(candidate)
+
+    page_path = get_page_path(page_id)
+    delete_file_if_exists(page_path)
+    
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
@@ -350,7 +394,61 @@ def list_pages():
 
     except Exception as e:
         return error_response(f"Failed to list pages: {str(e)}", 500)
+        
+@app.route("/api/pages/delete", methods=["POST"])
+def delete_pages():
+    try:
+        data = request.get_json()
+        if not data:
+            return error_response("Request body must be JSON", 400)
 
+        password = data.get("password", "")
+        if password != DELETE_PASSWORD:
+            return error_response("Unauthorized", 401)
+
+        ids = data.get("ids")
+        if ids is None:
+            single_id = data.get("id")
+            if single_id:
+                ids = [single_id]
+
+        if not ids or not isinstance(ids, list):
+            return error_response('Provide "id" or "ids" as a non-empty list', 400)
+
+        normalized_ids = []
+        for page_id in ids:
+            if isinstance(page_id, str):
+                page_id = page_id.strip().lower()
+                if page_id:
+                    normalized_ids.append(page_id)
+
+        if not normalized_ids:
+            return error_response("No valid ids provided", 400)
+
+        deleted = []
+        not_found = []
+
+        for page_id in normalized_ids:
+            metadata = load_page(page_id)
+            if metadata is None:
+                not_found.append(page_id)
+                continue
+
+            delete_page_assets(page_id, metadata)
+            deleted.append(page_id)
+
+        if deleted:
+            remove_from_master_list(deleted)
+
+        return jsonify({
+            "success": True,
+            "deleted": deleted,
+            "not_found": not_found,
+            "requested": normalized_ids
+        }), 200
+
+    except Exception as e:
+        return error_response(f"Failed to delete pages: {str(e)}", 500)
 
 @app.errorhandler(404)
 def not_found(e):
