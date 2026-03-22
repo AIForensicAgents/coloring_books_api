@@ -368,7 +368,7 @@ def update_page(page_id):
 
 
 @app.route("/api/Xsearch", methods=["GET"])
-def search_pages():
+def Xsearch_pages():
     try:
         location_filter = request.args.get("location", "").lower().strip()
         age_filter = request.args.get("age", "").lower().strip()
@@ -484,7 +484,7 @@ def search_pages():
         return error_response(f"Search failed: {str(e)}", 500)
         
 @app.route("/api/Xpages", methods=["GET"])
-def list_pages():
+def Xlist_pages():
     try:
         n = request.args.get("n", 20, type=int)
         if n < 1:
