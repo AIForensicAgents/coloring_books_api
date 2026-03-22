@@ -367,7 +367,7 @@ def update_page(page_id):
         return error_response(f"Failed to update page: {str(e)}", 500)
 
 
-@app.route("/api/search", methods=["GET"])
+@app.route("/api/Xsearch", methods=["GET"])
 def search_pages():
     try:
         location_filter = request.args.get("location", "").lower().strip()
@@ -413,8 +413,77 @@ def search_pages():
     except Exception as e:
         return error_response(f"Search failed: {str(e)}", 500)
 
+import random
 
-@app.route("/api/pages", methods=["GET"])
+@app.route("/api/search", methods=["GET"])
+def search_pages():
+    try:
+        location_filter = request.args.get("location", "").lower().strip()
+        age_filter = request.args.get("age", "").lower().strip()
+        genre_filter = request.args.get("genre", "").lower().strip()
+        tags_filter = request.args.get("tags", "").lower().strip()
+        q_filter = request.args.get("q", "").lower().strip()
+        limit = request.args.get("limit", 50, type=int)
+        offset = request.args.get("offset", 0, type=int)
+        random_mode = request.args.get("random", "false").lower() == "true"
+
+        if limit < 1:
+            limit = 1
+        if limit > 1000:
+            limit = 1000
+        if offset < 0:
+            offset = 0
+
+        entries = parse_master_list()
+        results = []
+
+        tag_filter_set = set()
+        if tags_filter:
+            tag_filter_set = {t.strip().lower() for t in tags_filter.split(",") if t.strip()}
+
+        for entry in entries:
+            if location_filter and location_filter not in entry["location"].lower():
+                continue
+            if age_filter and age_filter not in entry["age_range"].lower():
+                continue
+            if genre_filter and genre_filter not in entry["genre"].lower():
+                continue
+            if tag_filter_set:
+                entry_tags = {t.strip().lower() for t in entry["tags"].split(",") if t.strip()}
+                if not tag_filter_set.intersection(entry_tags):
+                    continue
+            if q_filter and q_filter not in entry["title"].lower():
+                continue
+            results.append(entry)
+
+        total = len(results)
+
+        if random_mode:
+            if offset > 0:
+                pool = results[offset:]
+            else:
+                pool = results
+
+            if len(pool) <= limit:
+                selected = pool[:]
+                random.shuffle(selected)
+            else:
+                selected = random.sample(pool, limit)
+        else:
+            selected = results[offset:offset + limit]
+
+        return jsonify({
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "mode": "random" if random_mode else "paged",
+            "results": selected,
+        }), 200
+
+    except Exception as e:
+        return error_response(f"Search failed: {str(e)}", 500)
+        
+@app.route("/api/Xpages", methods=["GET"])
 def list_pages():
     try:
         n = request.args.get("n", 20, type=int)
@@ -431,6 +500,41 @@ def list_pages():
             "total": len(entries),
             "count": len(recent),
             "pages": recent,
+        }), 200
+
+    except Exception as e:
+        return error_response(f"Failed to list pages: {str(e)}", 500)
+
+import random
+
+@app.route("/api/pages", methods=["GET"])
+def list_pages():
+    try:
+        n = request.args.get("n", 20, type=int)
+        random_mode = request.args.get("random", "false").lower() == "true"
+
+        if n < 1:
+            n = 1
+        if n > 1000:
+            n = 1000
+
+        entries = parse_master_list()
+
+        if random_mode:
+            if len(entries) <= n:
+                selected = entries[:]
+                random.shuffle(selected)
+            else:
+                selected = random.sample(entries, n)
+        else:
+            selected = entries[-n:] if len(entries) >= n else entries
+            selected.reverse()
+
+        return jsonify({
+            "total": len(entries),
+            "count": len(selected),
+            "pages": selected,
+            "mode": "random" if random_mode else "recent"
         }), 200
 
     except Exception as e:
