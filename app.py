@@ -77,7 +77,48 @@ def append_master_list(page_id, metadata):
     with open(MASTER_LIST, "a") as f:
         f.write(line + "\n")
 
+def append_master_list_p(page_id, metadata):
+    tags = metadata.get("tags", [])
+    if isinstance(tags, list):
+        tags_str = ",".join(tags)
+    else:
+        tags_str = str(tags)
 
+    new_line = "|".join([
+        page_id,
+        metadata.get("title", ""),
+        metadata.get("location", ""),
+        metadata.get("age_range", ""),
+        metadata.get("genre", ""),
+        tags_str,
+        metadata.get("created_at", ""),
+    ])
+
+    lines = []
+    found = False
+
+    # Read existing lines if file exists
+    try:
+        with open(MASTER_LIST, "r") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        pass
+
+    # Update if page_id exists
+    for i, line in enumerate(lines):
+        parts = line.strip().split("|")
+        if parts and parts[0] == page_id:
+            lines[i] = new_line + "\n"
+            found = True
+            break
+
+    # Append if not found
+    if not found:
+        lines.append(new_line + "\n")
+
+    # Write back entire file (idempotent)
+    with open(MASTER_LIST, "w") as f:
+        f.writelines(lines)
 def parse_master_list():
     entries = []
     if not os.path.exists(MASTER_LIST):
@@ -319,7 +360,7 @@ def update_page(page_id):
         metadata["updated_at"] = now
 
         save_page(page_id, metadata)
-
+        append_master_list_p(page_id, metadata)
         return jsonify(metadata), 200
 
     except Exception as e:
