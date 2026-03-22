@@ -8,6 +8,10 @@ primary_region = 'ams'
 
 [build]
 
+[[mounts]]
+destination = "/pages"
+source = "pages_data"
+
 [http_service]
   internal_port = 8080
   force_https = true
