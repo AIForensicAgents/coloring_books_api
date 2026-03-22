@@ -17,6 +17,7 @@ IMAGES_FULLSIZE = os.path.join(PAGES_ROOT, "images", "fullsize")
 MASTER_LIST = os.path.join(PAGES_ROOT, "masterList.txt")
 
 
+
 def ensure_dirs():
     os.makedirs(IMAGES_THUMBNAILS, exist_ok=True)
     os.makedirs(IMAGES_FULLSIZE, exist_ok=True)
