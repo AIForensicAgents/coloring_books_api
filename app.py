@@ -32,7 +32,9 @@ ensure_dirs()
 
 def get_page_dir(page_id):
     if len(page_id) < 3:
-        a, b, c = page_id[0] if len(page_id) > 0 else "_", page_id[1] if len(page_id) > 1 else "_", page_id[2] if len(page_id) > 2 else "_"
+        a = page_id[0] if len(page_id) > 0 else "_"
+        b = page_id[1] if len(page_id) > 1 else "_"
+        c = page_id[2] if len(page_id) > 2 else "_"
     else:
         a, b, c = page_id[0], page_id[1], page_id[2]
     return os.path.join(PAGES_ROOT, a, b, c)
@@ -48,7 +50,10 @@ def load_page(page_id):
     if not os.path.exists(path):
         return None
     with open(path, "r") as f:
-        return json.load(f)
+        data = json.load(f)
+    if "image_errors" not in data:
+        data["image_errors"] = None
+    return data
 
 
 def save_page(page_id, data):
@@ -160,7 +165,8 @@ def delete_page_assets(page_id, metadata=None):
 
     page_path = get_page_path(page_id)
     delete_file_if_exists(page_path)
-    
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
@@ -210,6 +216,7 @@ def create_page():
             "updated_at": now,
             "thumbnail_path": thumbnail_path,
             "fullsize_path": fullsize_path,
+            "image_errors": data.get("image_errors", None),
         }
 
         save_page(page_id, metadata)
@@ -241,7 +248,6 @@ def get_thumbnail(page_id):
 
         thumbnail_path = metadata.get("thumbnail_path", "")
         if not thumbnail_path or not os.path.exists(thumbnail_path):
-            # Try to find by pattern
             found = False
             for ext in [".png", ".jpg", ".jpeg", ".webp", ".gif"]:
                 candidate = os.path.join(IMAGES_THUMBNAILS, f"{page_id}{ext}")
@@ -308,7 +314,7 @@ def update_page(page_id):
         data.pop("thumbnail_extension", None)
         data.pop("fullsize_extension", None)
 
-        updatable_fields = ["title", "description", "location", "age_range", "genre", "tags", "creator"]
+        updatable_fields = ["title", "description", "location", "age_range", "genre", "tags", "creator", "image_errors"]
         for field in updatable_fields:
             if field in data:
                 if field == "tags" and isinstance(data[field], str):
@@ -394,7 +400,8 @@ def list_pages():
 
     except Exception as e:
         return error_response(f"Failed to list pages: {str(e)}", 500)
-        
+
+
 @app.route("/api/pages/delete", methods=["POST"])
 def delete_pages():
     try:
@@ -444,11 +451,12 @@ def delete_pages():
             "success": True,
             "deleted": deleted,
             "not_found": not_found,
-            "requested": normalized_ids
+            "requested": normalized_ids,
         }), 200
 
     except Exception as e:
         return error_response(f"Failed to delete pages: {str(e)}", 500)
+
 
 @app.errorhandler(404)
 def not_found(e):
