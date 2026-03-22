@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+import random
 import base64
 from datetime import datetime, timezone
 from pathlib import Path
@@ -414,7 +415,6 @@ def Xsearch_pages():
     except Exception as e:
         return error_response(f"Search failed: {str(e)}", 500)
 
-import random
 
 @app.route("/api/search", methods=["GET"])
 def search_pages():
