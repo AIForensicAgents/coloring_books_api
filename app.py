@@ -530,7 +530,47 @@ def search_pages():
     except Exception as e:
         return error_response(f"Search failed: {str(e)}", 500)
 
+@app.route("/api/pages/<page_id>/thumbnail", methods=["GET"])
+def get_thumbnail(page_id):
+    try:
+        metadata = load_page(page_id)
+        if metadata is None:
+            return error_response("Page not found", 404)
 
+        thumbnail_path = find_image_path(
+            page_id,
+            metadata.get("thumbnail_path", ""),
+            IMAGES_THUMBNAILS
+        )
+        if not thumbnail_path:
+            return error_response("Thumbnail not found", 404)
+
+        return send_file(thumbnail_path, conditional=True, max_age=86400)
+
+    except Exception as e:
+        return error_response(f"Failed to serve thumbnail: {str(e)}", 500)
+
+
+@app.route("/api/pages/<page_id>/fullsize", methods=["GET"])
+def get_fullsize(page_id):
+    try:
+        metadata = load_page(page_id)
+        if metadata is None:
+            return error_response("Page not found", 404)
+
+        fullsize_path = find_image_path(
+            page_id,
+            metadata.get("fullsize_path", ""),
+            IMAGES_FULLSIZE
+        )
+        if not fullsize_path:
+            return error_response("Full-size image not found", 404)
+
+        return send_file(fullsize_path, conditional=True, max_age=86400)
+
+    except Exception as e:
+        return error_response(f"Failed to serve full-size image: {str(e)}", 500)
+        
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"error": "Not found"}), 404
