@@ -540,7 +540,8 @@ def list_pages():
 
     except Exception as e:
         return error_response(f"Failed to list pages: {str(e)}", 500)
-        
+
+
 @app.route("/api/pages/delete", methods=["POST"])
 def delete_pages():
     try:
@@ -595,6 +596,19 @@ def delete_pages():
 
     except Exception as e:
         return error_response(f"Failed to delete pages: {str(e)}", 500)
+
+@app.route("/api/entries", methods=["GET"])
+def list_entries():
+    try:
+        entries = parse_master_list()
+
+        return jsonify({
+            "total": len(entries),
+            "entries": entries
+        }), 200
+
+    except Exception as e:
+        return error_response(f"Failed to list entries: {str(e)}", 500)
 
 @app.errorhandler(404)
 def not_found(e):
