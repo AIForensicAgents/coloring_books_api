@@ -325,8 +325,8 @@ def create_page():
         return error_response(f"Failed to create page: {str(e)}", 500)
 
 
-@app.route("/api/pages", methods=["GET"])
-def list_pages():
+@app.route("/api/Xpages", methods=["GET"])
+def Xlist_pages():
     try:
         n = request.args.get("n", 20, type=int)
         random_mode = request.args.get("random", "false").lower() == "true"
@@ -358,7 +358,74 @@ def list_pages():
     except Exception as e:
         return error_response(f"Failed to list pages: {str(e)}", 500)
 
+from flask import request, jsonify
+import random
 
+@app.route("/api/pages", methods=["GET"])
+def list_pages():
+    try:
+        n = request.args.get("n", default=20, type=int)
+        offset = request.args.get("offset", default=0, type=int)
+        random_mode = request.args.get("random", "false").lower() == "true"
+
+        if n is None:
+            n = 20
+        if offset is None:
+            offset = 0
+
+        n = max(1, min(n, 100))
+        offset = max(0, offset)
+
+        entries = load_index_entries()
+        total = len(entries)
+
+        if total == 0:
+            return jsonify({
+                "total": 0,
+                "count": 0,
+                "offset": offset,
+                "limit": n,
+                "has_more": False,
+                "pages": [],
+                "mode": "random" if random_mode else "recent"
+            }), 200
+
+        if random_mode:
+            if total <= n:
+                selected = entries[:]
+                random.shuffle(selected)
+            else:
+                selected = random.sample(entries, n)
+
+            return jsonify({
+                "total": total,
+                "count": len(selected),
+                "offset": 0,
+                "limit": n,
+                "has_more": False,
+                "pages": selected,
+                "mode": "random"
+            }), 200
+
+        # Recent mode:
+        # newest first, then paginate using offset from that ordered list
+        ordered = list(reversed(entries))
+        selected = ordered[offset:offset + n]
+        has_more = (offset + n) < total
+
+        return jsonify({
+            "total": total,
+            "count": len(selected),
+            "offset": offset,
+            "limit": n,
+            "has_more": has_more,
+            "pages": selected,
+            "mode": "recent"
+        }), 200
+
+    except Exception as e:
+        return error_response(f"Failed to list pages: {str(e)}", 500)
+        
 @app.route("/api/entries", methods=["GET"])
 def list_entries():
     try:
