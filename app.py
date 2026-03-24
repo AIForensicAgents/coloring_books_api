@@ -99,6 +99,12 @@ def normalize_tags(tags):
     return []
 
 
+def normalize_qa_state(value):
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
 def thumbnail_url_for(page_id):
     return f"/api/pages/{page_id}/thumbnail"
 
@@ -109,8 +115,14 @@ def fullsize_url_for(page_id):
 
 def make_index_entry(metadata):
     page_id = metadata.get("page_id", "")
+    qa_state = normalize_qa_state(metadata.get("qaState", {}))
+    qa_meta = qa_state.get("meta", {}) if isinstance(qa_state.get("meta"), dict) else {}
+
     return {
         "page_id": page_id,
+        "qaState": qa_state,
+        "qa_status": qa_meta.get("status"),
+        "qa_error_type": qa_meta.get("errorType"),
         "title": metadata.get("title", ""),
         "location": metadata.get("location", ""),
         "age_range": metadata.get("age_range", ""),
@@ -298,6 +310,7 @@ def create_page():
 
         metadata = {
             "page_id": page_id,
+            "qaState": normalize_qa_state(data.get("qaState", {})),
             "title": data.get("title", ""),
             "description": data.get("description", ""),
             "location": data.get("location", ""),
@@ -358,8 +371,6 @@ def Xlist_pages():
     except Exception as e:
         return error_response(f"Failed to list pages: {str(e)}", 500)
 
-from flask import request, jsonify
-import random
 
 @app.route("/api/pages", methods=["GET"])
 def list_pages():
@@ -407,8 +418,6 @@ def list_pages():
                 "mode": "random"
             }), 200
 
-        # Recent mode:
-        # newest first, then paginate using offset from that ordered list
         ordered = list(reversed(entries))
         selected = ordered[offset:offset + n]
         has_more = (offset + n) < total
@@ -425,7 +434,8 @@ def list_pages():
 
     except Exception as e:
         return error_response(f"Failed to list pages: {str(e)}", 500)
-        
+
+
 @app.route("/api/entries", methods=["GET"])
 def list_entries():
     try:
@@ -525,6 +535,9 @@ def update_page(page_id):
         if "tags" in data:
             metadata["tags"] = normalize_tags(data["tags"])
 
+        if "qaState" in data:
+            metadata["qaState"] = normalize_qa_state(data["qaState"])
+
         metadata["updated_at"] = now
         metadata["thumbnail_url"] = thumbnail_url_for(page_id)
         metadata["fullsize_url"] = fullsize_url_for(page_id)
@@ -546,6 +559,8 @@ def search_pages():
         genre_filter = request.args.get("genre", "").lower().strip()
         tags_filter = request.args.get("tags", "").lower().strip()
         q_filter = request.args.get("q", "").lower().strip()
+        qa_status_filter = request.args.get("qa_status", "").lower().strip()
+        qa_error_type_filter = request.args.get("qa_error_type", "").lower().strip()
         limit = request.args.get("limit", 50, type=int)
         offset = request.args.get("offset", 0, type=int)
         random_mode = request.args.get("random", "false").lower() == "true"
@@ -576,6 +591,10 @@ def search_pages():
                 if not tag_filter_set.intersection(entry_tags):
                     continue
             if q_filter and q_filter not in entry.get("title", "").lower():
+                continue
+            if qa_status_filter and qa_status_filter != str(entry.get("qa_status") or "").lower():
+                continue
+            if qa_error_type_filter and qa_error_type_filter != str(entry.get("qa_error_type") or "").lower():
                 continue
             results.append(entry)
 
